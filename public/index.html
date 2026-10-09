@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Coffee Test - spectator</title>
+<style>
+  :root {
+    --bg: #1d1714; --panel: #2a221d; --edge: #40342c; --ink: #f4ead9; --muted: #b6a593;
+    --accent: #e0a458; --good: #7bd88f; --bad: #ff8a80;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--edge); height: 52px; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .5px; white-space: nowrap; }
+  header span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  code { background: #00000040; padding: 1px 6px; border-radius: 4px; }
+  main { display: grid; grid-template-columns: 280px minmax(0, 1fr) 400px; gap: 12px; padding: 12px; height: calc(100vh - 52px); }
+  section { background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; overflow: auto; min-height: 0; display: flex; flex-direction: column; }
+  h2 { margin: 0; padding: 9px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); border-bottom: 1px solid var(--edge); position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .run { padding: 10px 14px; border-bottom: 1px solid var(--edge); cursor: pointer; }
+  .run:hover { background: #ffffff08; }
+  .run.sel { background: #e0a45822; border-left: 3px solid var(--accent); }
+  .run b { display: block; }
+  .run small { color: var(--muted); }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 9px; margin-left: 6px; }
+  .playing { background: #e0a45833; color: var(--accent); }
+  .won { background: #7bd88f33; color: var(--good); }
+  .failed { background: #ff8a8033; color: var(--bad); }
+  .empty { padding: 40px 20px; color: var(--muted); text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  td, th { padding: 6px 10px; border-bottom: 1px solid var(--edge); text-align: left; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.won, td.failed { background: none; }
+  .tabs { display: flex; position: sticky; top: 0; background: var(--panel); border-bottom: 1px solid var(--edge); z-index: 1; }
+  .tabs button { flex: 1; background: none; border: 0; color: var(--muted); padding: 10px; cursor: pointer; font: inherit; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
+  .tabs button.on { color: var(--ink); box-shadow: inset 0 -2px var(--accent); }
+
+  #house { overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid var(--edge); min-height: 42px; }
+  .bar .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .bar .title b { color: var(--ink); }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--edge); border-radius: 14px; cursor: pointer; user-select: none; color: var(--muted); font-size: 12.5px; background: none; font-family: inherit; }
+  .toggle.on { color: var(--ink); border-color: var(--accent); background: #e0a45822; }
+  #stage { position: relative; flex: 1; min-height: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; }
+  #stageEmpty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .lbl { font: 11px/1.2 "Segoe UI", sans-serif; color: #fff; background: #000000a8; padding: 1px 6px; border-radius: 8px; white-space: nowrap; transform: translateY(-10px); }
+  .lbl.furn { background: #3b2a1aa8; color: #f1d9b8; }
+  .lbl.room { background: none; color: #ffffffb0; font-size: 14px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; text-shadow: 0 1px 3px #000; }
+  .hint { position: absolute; left: 10px; bottom: 8px; color: #ffffff70; font-size: 11.5px; pointer-events: none; }
+
+  #side { overflow: auto; }
+  #fp { position: relative; background: #000; border-bottom: 1px solid var(--edge); }
+  #fp img { width: 100%; display: block; aspect-ratio: 960 / 600; }
+  #fp .cap { position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: #ffffffb0; background: #00000080; padding: 1px 6px; border-radius: 6px; }
+  #outcome { padding: 10px 14px; border-bottom: 1px solid var(--edge); display: none; }
+  #outcome .score { font-size: 18px; font-weight: 700; }
+  #outcome ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+  #outcome small { color: var(--muted); display: block; margin-top: 6px; }
+  .log { padding: 8px 14px; border-bottom: 1px solid var(--edge); }
+  .log .a { color: var(--accent); font-family: Consolas, monospace; font-size: 12px; word-break: break-all; }
+  .log.err .a { color: var(--bad); }
+  .log .hit { color: var(--good); font-family: "Segoe UI", system-ui, sans-serif; }
+  .log.err { background: #ff8a800d; }
+  .log .r { white-space: pre-wrap; color: var(--ink); font-size: 12.5px; margin-top: 2px; }
+  .log .t { float: right; color: var(--muted); font-size: 11px; margin-left: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>☕ The Coffee Test</h1>
+  <span>Point any MCP client at <code id="ep"></code> and ask it to make coffee.</span>
+</header>
+<main>
+  <section>
+    <div class="tabs"><button id="tRuns" class="on">Runs</button><button id="tBoard">Leaderboard</button></div>
+    <div id="runs"></div>
+    <div id="board" hidden></div>
+  </section>
+  <section id="house">
+    <div class="bar">
+      <div class="title" id="viewTitle">No run selected</div>
+      <button class="toggle" id="follow" title="Keep the orbit centered on the agent">◎ Follow agent</button>
+      <button class="toggle on" id="labelsBtn" title="Float thing names over the dollhouse">🏷 Labels</button>
+      <button class="toggle" id="resetBtn" title="Frame the whole house">⤢ Reset view</button>
+    </div>
+    <div id="stage">
+      <div id="labels"></div>
+      <div id="stageEmpty">Waiting for an agent to start a game…</div>
+      <div class="hint">drag: orbit · right-drag: pan · wheel: zoom</div>
+    </div>
+  </section>
+  <section id="side">
+    <h2>Agent's view</h2>
+    <div id="fp"><img id="img" alt="" /><span class="cap" id="fpCap">no frame yet</span></div>
+    <div id="outcome"></div>
+    <h2>Action log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+<script type="module" src="../src/client/spectator.ts"></script>
+</body>
+</html>
